@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: forgecommerce
+      POSTGRES_USER: forge
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change-me-in-env}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forge"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/forgecommerce
+      DB_USER: forge
+      DB_PASSWORD: ${DB_PASSWORD:-change-me-in-env}
+      APP_JWT_SECRET: ${APP_JWT_SECRET:?set APP_JWT_SECRET env var (Base64, 256-bit+)}
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:

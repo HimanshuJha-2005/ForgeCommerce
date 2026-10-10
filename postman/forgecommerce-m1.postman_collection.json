@@ -1,0 +1,89 @@
+{
+  "info": {
+    "name": "ForgeCommerce M1 - Auth Foundation",
+    "_postman_id": "forgecommerce-m1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "baseUrl", "value": "http://localhost:8080"},
+    {"key": "token", "value": ""}
+  ],
+  "item": [
+    {
+      "name": "Health (public)",
+      "request": {"method": "GET", "url": "{{baseUrl}}/api/health"}
+    },
+    {
+      "name": "Register CUSTOMER (201)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/auth/register",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"demo@example.com\",\"password\":\"password123\",\"role\":\"CUSTOMER\"}"
+        }
+      }
+    },
+    {
+      "name": "Register duplicate (409)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/auth/register",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"demo@example.com\",\"password\":\"password123\",\"role\":\"CUSTOMER\"}"
+        }
+      }
+    },
+    {
+      "name": "Register invalid email (400)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/auth/register",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"not-an-email\",\"password\":\"password123\",\"role\":\"CUSTOMER\"}"
+        }
+      }
+    },
+    {
+      "name": "Login (200, copy token -> {{token}})",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/auth/login",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"demo@example.com\",\"password\":\"password123\"}"
+        }
+      }
+    },
+    {
+      "name": "Login wrong password (401)",
+      "request": {
+        "method": "POST",
+        "url": "{{baseUrl}}/api/auth/login",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"demo@example.com\",\"password\":\"wrong\"}"
+        }
+      }
+    },
+    {
+      "name": "Me without token (401)",
+      "request": {"method": "GET", "url": "{{baseUrl}}/api/auth/me"}
+    },
+    {
+      "name": "Me with token (200)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/auth/me",
+        "header": [{"key": "Authorization", "value": "Bearer {{token}}"}]
+      }
+    }
+  ]
+}

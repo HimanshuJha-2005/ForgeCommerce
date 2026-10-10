@@ -1,0 +1,35 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: forgecommerce
+  datasource:
+    # Local runtime default: PostgreSQL via docker-compose.
+    # Tests override this with H2 (see src/test/resources/application.yml).
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/forgecommerce}
+    username: ${DB_USER:forge}
+    password: ${DB_PASSWORD:change-me-in-env}
+    hikari:
+      maximum-pool-size: 10
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+app:
+  jwt:
+    # Base64-encoded 256-bit+ secret. Generate with e.g.:
+    #   python3 -c "import secrets,base64;print(base64.b64encode(secrets.token_bytes(32)).decode())"
+    # NEVER commit a real secret; pass via env var APP_JWT_SECRET.
+    secret: ${APP_JWT_SECRET:}
+    expiration-ms: ${APP_JWT_EXPIRATION_MS:3600000}
+
+logging:
+  level:
+    com.forgecommerce: INFO
+    org.springframework.security: INFO
