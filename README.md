@@ -107,7 +107,7 @@ No coverage % claimed (JaCoCo not wired).
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.0.12.101-hotspot"
 $env:Path = "C:\Tools\apache-maven-3.9.9\bin;$env:JAVA_HOME\bin;" + $env:Path
-cd trinity-portfolio\forgecommerce
+cd forgecommerce   # C:\Users\Himanush Jha\forgecommerce
 mvn test
 $env:APP_JWT_SECRET = "<base64 32+ bytes>"; $env:DB_PASSWORD = "dev-only-password"
 docker compose up --build        # Postgres + API on :8080
