@@ -1,104 +1,102 @@
 # ForgeCommerce
 
-![backend](https://github.com/HimanshuJha-2005/ForgeCommerce/actions/workflows/backend.yml/badge.svg)
+Commerce backend and storefront built with Spring Boot, PostgreSQL, and React. It covers authentication, a product catalog, a cart, transactional checkout, order lifecycle, and simulated payments.
 
-Full-stack commerce platform — **Spring Boot + PostgreSQL + React** — with JWT authentication,
-role-based access control, a searchable product catalog, cart, transactional checkout, and
-simulated payments.
-
-## Screenshots
-
-| Storefront | Order detail | Seller dashboard |
-|---|---|---|
-| ![Storefront](docs/screenshots/storefront.png) | ![Order](docs/screenshots/order.png) | ![Seller](docs/screenshots/seller.png) |
+[![backend](https://github.com/HimanshuJha-2005/ForgeCommerce/actions/workflows/backend.yml/badge.svg)](https://github.com/HimanshuJha-2005/ForgeCommerce/actions)
 
 ## Features
 
-- **Auth** — registration, login, JWT (1h expiry), BCrypt hashing; roles `CUSTOMER` / `SELLER` / `ADMIN` enforced server-side
-- **Catalog** — product listing with search, category filter, sorting and pagination; admin-only categories; seller product CRUD and stock management
-- **Seller analytics** — catalog summary (counts, averages, per-category breakdown) computed with the Streams API
-- **Cart** — per-user cart with live stock validation
-- **Orders** — checkout runs as a single transaction: lock stock rows → validate → decrement → create order, price-snapshotted items and payment → clear cart; idempotency keys make retries safe
-- **Order lifecycle** — `PENDING → CONFIRMED → PROCESSING → SHIPPED → DELIVERED` plus `CANCELLED`; illegal transitions rejected
-- **Payments (simulated)** — success/failure simulation driving order confirmation or cancellation with automatic restock
-- **Storefront (React)** — browsing, cart, checkout, order history, seller dashboard; protected routes, loading/error/empty states, responsive layout
+- Registration and login with JWT (one-hour expiry) and BCrypt hashing. Roles `CUSTOMER`, `SELLER`, and `ADMIN` are enforced on the server.
+- Product catalog with search, category filter, sorting, and pagination. Sellers manage their products and stock; categories are admin-only.
+- Seller summary with product counts, averages, and category breakdown.
+- Per-user cart with stock validation on every change.
+- Checkout in one transaction: lock stock rows, validate, decrement, create the order and payment, snapshot prices, clear the cart. An idempotency key makes retries return the original order.
+- Order lifecycle `PENDING -> CONFIRMED -> PROCESSING -> SHIPPED -> DELIVERED`, plus `CANCELLED`. Illegal transitions are rejected.
+- Simulated payment outcome drives confirmation or cancellation and restocks on failure.
+- React storefront with browsing, cart, checkout, order history, and a seller dashboard.
 
-## Tech stack
+## Stack
 
-| Layer | Technologies |
+| Layer | Technology |
 |---|---|
-| Backend | Java 21, Spring Boot 3.2 (Web, Security, Data JPA, Validation), JJWT |
+| Backend | Java 21, Spring Boot 3.2.5, Spring Security, Spring Data JPA, JJWT |
 | Database | PostgreSQL 16, Flyway migrations, H2 for tests |
-| Frontend | React 18, React Router, Vite |
-| Build & infra | Maven, Docker Compose, GitHub Actions |
+| Frontend | React 19, React Router 7, Vite |
+| Build | Maven, Docker Compose, GitHub Actions |
 
 ## Quick start
 
 ```bash
-# Backend tests (no infrastructure needed)
+# Backend tests (no database needed)
 mvn test
 
-# Full stack with Postgres
+# Full stack
 export APP_JWT_SECRET=$(python3 -c "import secrets,base64;print(base64.b64encode(secrets.token_bytes(32)).decode())")
 export DB_PASSWORD=dev-password
-docker compose up --build        # API on :8080
+docker compose up --build          # API on :8080
 
 # Frontend
 cd frontend && npm install && npm run dev   # UI on :5173
 ```
 
-## API reference
+The API container runs Flyway migrations at startup and validates the schema with `ddl-auto: validate`. Use a new `APP_JWT_SECRET` outside local development.
+
+## API
 
 | Method | Endpoint | Auth | Notes |
 |---|---|---|---|
-| POST | `/api/auth/register`, `/api/auth/login` | — | Returns JWT; 409 on duplicate email |
+| POST | `/api/auth/register`, `/api/auth/login` | none | Returns a JWT; 409 on duplicate email |
 | GET | `/api/auth/me` | JWT | Current identity |
-| GET | `/api/products`, `/api/categories` | — | `query`, `categoryId`, `sort`, `page`, `size` |
-| POST / PUT / DELETE | `/api/products/**`, `/api/categories/**` | Seller/Admin | 403 otherwise |
-| GET | `/api/products/analytics/summary` | Seller/Admin | Aggregated catalog stats |
-| GET / POST / DELETE | `/api/cart`, `/api/cart/items/**` | JWT | 409 when quantity exceeds stock |
-| POST | `/api/orders` | JWT | Body: `idempotencyKey`; 201 new, 200 on retry |
-| GET | `/api/orders`, `/api/orders/{id}` | JWT | Owners see own orders |
-| POST | `/api/orders/{id}/cancel` | Owner/Admin | Only from `PENDING` / `CONFIRMED` |
+| GET | `/api/products`, `/api/categories` | none | Supports `query`, `categoryId`, `sort`, `page`, `size` |
+| POST/PUT/DELETE | `/api/products/**`, `/api/categories/**` | Seller/Admin | 403 otherwise |
+| GET | `/api/products/analytics/summary` | Seller/Admin | Catalog aggregates |
+| GET/POST/DELETE | `/api/cart`, `/api/cart/items/**` | JWT | 409 when quantity exceeds stock |
+| POST | `/api/orders` | JWT | Body includes `idempotencyKey`; 201 new, 200 on retry |
+| GET | `/api/orders`, `/api/orders/{id}` | JWT | Owners see their orders |
+| POST | `/api/orders/{id}/cancel` | Owner/Admin | Only from `PENDING` or `CONFIRMED` |
 | PATCH | `/api/orders/{id}/status` | Seller/Admin | 422 on illegal transition |
-| POST | `/api/orders/{id}/payment/simulate` | Owner/Staff | `{"outcome": "SUCCESS" \| "FAILED"}` |
+| POST | `/api/orders/{id}/payment/simulate` | Owner/Staff | `{"outcome": "SUCCESS"}` or `{"outcome": "FAILED"}` |
 
-All errors return a uniform JSON body: `{timestamp, status, error, message, path}`.
+Errors use one shape: `{timestamp, status, error, message, path}`.
 
 ## Architecture
 
 ```
-React (Vite, :5173) ──JSON + Bearer JWT──▶ Spring Boot (:8080) ──▶ PostgreSQL (:5432)
-                                             │  Controller → Service (@Transactional) → Repository
-                                             └── GlobalExceptionHandler → uniform error JSON
+React (Vite, :5173) -- JSON + Bearer JWT --> Spring Boot (:8080) --> PostgreSQL (:5432)
+                                               Controller -> Service (@Transactional) -> Repository
+                                               GlobalExceptionHandler -> uniform error JSON
 ```
 
-Key design points: stateless JWT (no session store); pessimistic stock locking at checkout so
-concurrent orders can't oversell; order items snapshot prices so catalog edits never rewrite
-history; Flyway-versioned schema validated at startup (`ddl-auto: validate`).
+Design notes:
 
-## Project structure
+- Stateless JWT, no session store.
+- Pessimistic row locks on stock during checkout prevent overselling under concurrency.
+- Order items store a price snapshot, so later catalog edits do not rewrite order history.
+- Flyway owns the schema; Hibernate only validates it.
+
+## Layout
 
 ```
 src/main/java/com/forgecommerce/
-├── auth/        # users, registration, login, JWT
-├── catalog/     # categories, products, inventory
-├── order/       # cart, orders, payments
-├── common/      # global exception handling
-├── config/      # security configuration
-└── health/      # liveness probe
-src/main/resources/db/migration/   # V1 users → V2 catalog → V3 orders
-frontend/src/    # pages, auth context, API client
+  auth/        users, registration, login, JWT
+  catalog/     categories, products, inventory
+  order/       cart, orders, payments
+  security/    filter, token service, user details
+  common/      error handling
+  config/      security configuration
+  health/      liveness endpoint
+src/main/resources/db/migration/   V1 users, V2 catalog, V3 orders
+frontend/src/                      pages, auth context, API client
 ```
 
 ## Testing
 
-27 tests, run in CI on every push: JWT unit tests, auth API tests (success, duplicate,
-validation, authorization), catalog tests (RBAC, pagination, stock rules, analytics) and
-order tests (checkout, idempotency, oversell, payment flows, transitions). `mvn test` needs
-no external services.
+27 tests cover JWT handling, authentication and authorization, catalog RBAC and pagination, stock rules, checkout, idempotency, oversell prevention, payment outcomes, and order transitions. `mvn test` uses H2 and needs no external services. CI runs the same suite on every push.
 
-## Limitations & roadmap
+## Limitations
 
-Not yet covered: refresh-token rotation, login rate limiting, Testcontainers-based DB tests,
-full Postman collection, production deployment. Planned next.
+No refresh-token rotation, login rate limiting, or Testcontainers-backed database tests yet. Payments are simulated; there is no payment provider integration. There is no production deployment in this repository.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
